@@ -161,6 +161,166 @@ namespace N
 	}
 	
 	[Fact]
+	public void SimpleSort()
+	{
+		var generator = new DataTableGenerator.DataTableGenerator();
+
+		/* lang=C#-test, lang=C# */
+		var source = @"
+namespace N
+{
+	[DataTableGenerator.DataTable(""Id"")]
+	[DataTableGenerator.DataTableSort(""Name"")]
+	class AData
+	{
+		public int Id { get; set; }
+		public string Name { get; set; }
+	}
+}
+";
+
+		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+using System.Linq;
+
+namespace N
+{
+	public partial class ADataStore
+	{
+		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
+		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> SortedByNameList = new();
+		public IReadOnlyList<N.AData> SortedByName => SortedByNameList;
+		public void SetData(IEnumerable<N.AData> data)
+		{
+			var dataList = data.ToList();
+			UniqueIndexDictionary.Clear();
+			foreach (var d in dataList)
+			{
+				UniqueIndexDictionary.Add(d.Id, d);
+			}
+			SortedByNameList = dataList.OrderBy(d => d.Name).ToList();
+		}
+		public void UpdateData(IEnumerable<N.AData> data)
+		{
+			foreach (var d in data)
+			{
+				UniqueIndexDictionary[d.Id] = d;
+			}
+		}
+	}
+}
+", r.Sources.Find(static x => x.HintName=="N AData.cs").SourceText.ToString());
+	}
+
+	[Fact]
+	public void SimpleSortDesc()
+	{
+		var generator = new DataTableGenerator.DataTableGenerator();
+
+		/* lang=C#-test, lang=C# */
+		var source = @"
+namespace N
+{
+	[DataTableGenerator.DataTable(""Id"")]
+	[DataTableGenerator.DataTableSort(""Name:desc"")]
+	class AData
+	{
+		public int Id { get; set; }
+		public string Name { get; set; }
+	}
+}
+";
+
+		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+using System.Linq;
+
+namespace N
+{
+	public partial class ADataStore
+	{
+		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
+		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> SortedByNameDescList = new();
+		public IReadOnlyList<N.AData> SortedByNameDesc => SortedByNameDescList;
+		public void SetData(IEnumerable<N.AData> data)
+		{
+			var dataList = data.ToList();
+			UniqueIndexDictionary.Clear();
+			foreach (var d in dataList)
+			{
+				UniqueIndexDictionary.Add(d.Id, d);
+			}
+			SortedByNameDescList = dataList.OrderByDescending(d => d.Name).ToList();
+		}
+		public void UpdateData(IEnumerable<N.AData> data)
+		{
+			foreach (var d in data)
+			{
+				UniqueIndexDictionary[d.Id] = d;
+			}
+		}
+	}
+}
+", r.Sources.Find(static x => x.HintName=="N AData.cs").SourceText.ToString());
+	}
+
+	[Fact]
+	public void MultipleKeysSort()
+	{
+		var generator = new DataTableGenerator.DataTableGenerator();
+
+		/* lang=C#-test, lang=C# */
+		var source = @"
+namespace N
+{
+	[DataTableGenerator.DataTable(""Id"")]
+	[DataTableGenerator.DataTableSort(""Level:desc"", ""Name"")]
+	class AData
+	{
+		public int Id { get; set; }
+		public int Level { get; set; }
+		public string Name { get; set; }
+	}
+}
+";
+
+		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+using System.Linq;
+
+namespace N
+{
+	public partial class ADataStore
+	{
+		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
+		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> SortedByLevelDescAndNameList = new();
+		public IReadOnlyList<N.AData> SortedByLevelDescAndName => SortedByLevelDescAndNameList;
+		public void SetData(IEnumerable<N.AData> data)
+		{
+			var dataList = data.ToList();
+			UniqueIndexDictionary.Clear();
+			foreach (var d in dataList)
+			{
+				UniqueIndexDictionary.Add(d.Id, d);
+			}
+			SortedByLevelDescAndNameList = dataList.OrderByDescending(d => d.Level).ThenBy(d => d.Name).ToList();
+		}
+		public void UpdateData(IEnumerable<N.AData> data)
+		{
+			foreach (var d in data)
+			{
+				UniqueIndexDictionary[d.Id] = d;
+			}
+		}
+	}
+}
+", r.Sources.Find(static x => x.HintName=="N AData.cs").SourceText.ToString());
+	}
+
+	[Fact]
 	public void MultipleIndexes()
 	{
 		var generator = new DataTableGenerator.DataTableGenerator();

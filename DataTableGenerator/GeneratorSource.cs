@@ -102,6 +102,115 @@ namespace DataTableGenerator
 		}
 	}
 
+	internal class SortKeySource : IEquatable<SortKeySource>
+	{
+		public string Name { get; }
+		public bool Descending { get; }
+		public string PropertySegment => Descending ? Name + "Desc" : Name;
+
+		public SortKeySource(string raw)
+		{
+			if (raw != null && raw.EndsWith(":desc", StringComparison.OrdinalIgnoreCase))
+			{
+				Name = raw.Substring(0, raw.Length - 5);
+				Descending = true;
+			}
+			else if (raw != null && raw.EndsWith(":asc", StringComparison.OrdinalIgnoreCase))
+			{
+				Name = raw.Substring(0, raw.Length - 4);
+				Descending = false;
+			}
+			else
+			{
+				Name = raw;
+				Descending = false;
+			}
+		}
+
+		public bool Equals(SortKeySource other)
+		{
+			if (other is null) return false;
+			if (ReferenceEquals(this, other)) return true;
+			return Name == other.Name && Descending == other.Descending;
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (obj is null) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != GetType()) return false;
+			return Equals((SortKeySource)obj);
+		}
+
+		public override int GetHashCode()
+		{
+			unchecked
+			{
+				return ((Name != null ? Name.GetHashCode() : 0) * 397) ^ Descending.GetHashCode();
+			}
+		}
+	}
+
+	internal class SortSource : IEquatable<SortSource>
+	{
+		public AttributeData Attribute { get; }
+		public SortKeySource[] Keys { get; }
+		public string CombinedName { get; }
+
+		public SortSource(AttributeData attribute)
+		{
+			Attribute = attribute;
+			var rawKeys = attribute.ConstructorArguments
+				.SelectMany(static x => x.Values.Select(static v => v.Value as string)).ToArray();
+			Keys = rawKeys.Select(static k => new SortKeySource(k)).ToArray();
+			CombinedName = string.Join("And", Keys.Select(static k => k.PropertySegment));
+		}
+
+		public void Validate(GeneratorSource src, Dictionary<string, (ISymbol symbol, string qualifiedTypeName)> members)
+		{
+			foreach (var key in Keys)
+			{
+				var n = key.Name;
+				if (members.ContainsKey(n)) continue;
+				var m = src.Target.GetMembers(n);
+				if (m.Length == 0)
+					throw new IndexSourceConversionException(IndexSourceConversionException.Error.InvalidIndexName, n);
+				switch (m[0])
+				{
+					case IFieldSymbol field:
+						members[n] = (field, field.Type.QualifiedName());
+						break;
+					case IPropertySymbol property:
+						members[n] = (property, property.Type.QualifiedName());
+						break;
+					default:
+						throw new IndexSourceConversionException(
+							IndexSourceConversionException.Error.IndexNameMustBePropertyOrField, n);
+				}
+			}
+		}
+
+		public bool Equals(SortSource other)
+		{
+			if (other is null) return false;
+			if (ReferenceEquals(this, other)) return true;
+			return Keys.AsSpan().SequenceEqual(other.Keys);
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (obj is null) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != GetType()) return false;
+			return Equals((SortSource)obj);
+		}
+
+		public override int GetHashCode()
+		{
+			return Keys != null ? Keys.GetHashCode() : 0;
+		}
+	}
+
 	internal class GeneratorSource : IEquatable<GeneratorSource>
 	{
 		public GeneratorAttributeSyntaxContext Context { get; }
@@ -111,9 +220,10 @@ namespace DataTableGenerator
 		public string QualifiedName { get; }
 		public IndexSource UniqueKeySource { get; }
 		public IndexSource[] IndexSources { get; }
+		public SortSource[] SortSources { get; }
 
 		public GeneratorSource(GeneratorAttributeSyntaxContext context, INamedTypeSymbol target,
-			IndexSource uniqueKeySource, IndexSource[] indexSources)
+			IndexSource uniqueKeySource, IndexSource[] indexSources, SortSource[] sortSources)
 		{
 			Context = context;
 			Target = target;
@@ -122,6 +232,7 @@ namespace DataTableGenerator
 			QualifiedName = target.QualifiedName();
 			UniqueKeySource = uniqueKeySource;
 			IndexSources = indexSources;
+			SortSources = sortSources;
 		}
 
 		public bool Equals(GeneratorSource other)
@@ -130,7 +241,8 @@ namespace DataTableGenerator
 			if (ReferenceEquals(this, other)) return true;
 			return Namespace == other.Namespace && Name == other.Name &&
 				UniqueKeySource.Equals(other.UniqueKeySource) &&
-				IndexSources.AsSpan().SequenceEqual(other.IndexSources);
+				IndexSources.AsSpan().SequenceEqual(other.IndexSources) &&
+				SortSources.AsSpan().SequenceEqual(other.SortSources);
 		}
 
 		public override bool Equals(object obj)
@@ -148,6 +260,7 @@ namespace DataTableGenerator
 				var hashCode = (Namespace != null ? Namespace.GetHashCode() : 0);
 				hashCode = (hashCode * 397) ^ (Name != null ? Name.GetHashCode() : 0);
 				hashCode = (hashCode * 397) ^ (IndexSources != null ? IndexSources.GetHashCode() : 0);
+				hashCode = (hashCode * 397) ^ (SortSources != null ? SortSources.GetHashCode() : 0);
 				return hashCode;
 			}
 		}
