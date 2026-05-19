@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -48,6 +48,23 @@ namespace DataTableGenerator
 	}
 }
 ");
+
+				ctx.AddSource("DataTableSortAttribute.cs", /* lang=C#-test, lang=C# */ @"
+using System;
+
+namespace DataTableGenerator
+{
+	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+	internal sealed class DataTableSortAttribute : Attribute
+	{
+		public string[] Keys;
+		public DataTableSortAttribute(params string[] keys)
+		{
+			Keys = keys;
+		}
+	}
+}
+");
 			});
 
 			var source = context.SyntaxProvider.ForAttributeWithMetadataName(
@@ -65,7 +82,12 @@ namespace DataTableGenerator
 			{
 				indexList.Add(new IndexSource(attr));
 			}
-			return new GeneratorSource(context, targetSymbol, uniqueKey, indexList.ToArray());
+			var sortList = new List<SortSource>();
+			foreach (var attr in targetSymbol.FindAttributes("DataTableGenerator", "DataTableSortAttribute"))
+			{
+				sortList.Add(new SortSource(attr));
+			}
+			return new GeneratorSource(context, targetSymbol, uniqueKey, indexList.ToArray(), sortList.ToArray());
 		}
 
 		static void Emit(SourceProductionContext context, GeneratorSource source)
@@ -76,6 +98,7 @@ namespace DataTableGenerator
 					var members = new Dictionary<string, (ISymbol symbol, string qualifiedTypeName)>();
 					(string type, string[] names) uniqueKey;
 					var indexList = new List<(string type, string[] names, string combinedName)>();
+					var sortList = new List<SortSource>();
 
 					if (src.UniqueKeySource.Names.Length == 0)
 					{
@@ -140,6 +163,39 @@ namespace DataTableGenerator
 						}
 					}
 
+					foreach (var sort in src.SortSources)
+					{
+						if (sort.Keys.Length == 0)
+						{
+							Errors.SortKeysRequired(ctx, src.Target, sort.Attribute);
+							throw new Exception();
+						}
+						else if (Array.Exists(sort.Keys, static x => x.Name == null))
+						{
+							Errors.SortKeysMustBeString(ctx, src.Target, sort.Attribute);
+							throw new Exception();
+						}
+
+						try
+						{
+							sort.Validate(src, members);
+							sortList.Add(sort);
+						}
+						catch (IndexSourceConversionException ex)
+						{
+							switch (ex.ErrorCode)
+							{
+								case IndexSourceConversionException.Error.InvalidIndexName:
+									Errors.InvalidSortKeyName(ctx, src.Target, sort.Attribute, ex.Name);
+									break;
+								case IndexSourceConversionException.Error.IndexNameMustBePropertyOrField:
+									Errors.SortKeyMustBePropertyOrField(ctx, src.Target, sort.Attribute, ex.Name);
+									break;
+							}
+							throw;
+						}
+					}
+
 					sb.AppendLine(@"using System.Collections.Generic;
 using System.Linq;
 ");
@@ -162,16 +218,29 @@ using System.Linq;
 		public IReadOnlyDictionary<{index.type}, {src.QualifiedName}> {index.combinedName}Index => {index.combinedName}Dictionary;");
 					}
 
+					foreach (var sort in sortList)
+					{
+						sb.AppendLine($"		List<{src.QualifiedName}> SortedBy{sort.CombinedName}List = new();");
+						sb.AppendLine($"		public IReadOnlyList<{src.QualifiedName}> SortedBy{sort.CombinedName} => SortedBy{sort.CombinedName}List;");
+					}
 
 					sb.AppendLine(@$"		public void SetData(IEnumerable<{src.QualifiedName}> data)
-		{{
-			UniqueIndexDictionary.Clear();");
+		{{");
+
+					var dataVar = "data";
+					if (sortList.Count > 0)
+					{
+						sb.AppendLine($"			var dataList = data.ToList();");
+						dataVar = "dataList";
+					}
+
+					sb.AppendLine($"			UniqueIndexDictionary.Clear();");
 					foreach (var index in indexList)
 					{
 						sb.AppendLine($"			{index.combinedName}Dictionary.Clear();");
 					}
-sb.AppendLine(@"			foreach (var d in data)
-			{");
+					sb.AppendLine(@$"			foreach (var d in {dataVar})
+			{{");
 					if (uniqueKey.names.Length == 1)
 					{
 						sb.AppendLine($"				UniqueIndexDictionary.Add(d.{uniqueKey.names[0]}, d);");
@@ -193,8 +262,26 @@ sb.AppendLine(@"			foreach (var d in data)
 								$"				{index.combinedName}Dictionary.Add(({string.Join(", ", index.names.Select(static x => "d." + x))}), d);");
 						}
 					}
-					sb.AppendLine(@"			}
-		}");
+					sb.AppendLine(@"			}");
+
+					foreach (var sort in sortList)
+					{
+						using var __ = StringBuilderHolder.Get(out var linq);
+						var firstKey = sort.Keys[0];
+						linq.Append(firstKey.Descending
+							? $"OrderByDescending(d => d.{firstKey.Name})"
+							: $"OrderBy(d => d.{firstKey.Name})");
+						for (var i = 1; i < sort.Keys.Length; i++)
+						{
+							var key = sort.Keys[i];
+							linq.Append(key.Descending
+								? $".ThenByDescending(d => d.{key.Name})"
+								: $".ThenBy(d => d.{key.Name})");
+						}
+						sb.AppendLine($"			SortedBy{sort.CombinedName}List = {dataVar}.{linq}.ToList();");
+					}
+
+					sb.AppendLine(@"		}");
 
 
 					sb.AppendLine(@$"		public void UpdateData(IEnumerable<{src.QualifiedName}> data)

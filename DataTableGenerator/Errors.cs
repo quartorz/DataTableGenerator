@@ -109,5 +109,53 @@ namespace DataTableGenerator
 				name, target.QualifiedName());
 			context.ReportDiagnostic(diagnostic);
 		}
+
+		public static void SortKeysRequired(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator010", title: "Sort Keys are Required",
+					messageFormat: "Sort keys are required for {0}", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
+
+		public static void SortKeysMustBeString(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator011", title: "Sort Key must be String",
+					messageFormat: "Sort keys for {0} must all be strings", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
+
+		public static void InvalidSortKeyName(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute, string name)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator012", title: "Invalid Sort Key Name",
+					messageFormat: "The name '{0}' is not a valid member name of {1}", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				name, target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
+
+		public static void SortKeyMustBePropertyOrField(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute, string name)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator013", title: "Invalid Sort Key Name",
+					messageFormat: "'{0}' is not a property or field of {1}", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				name, target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
 	}
 }
