@@ -32,6 +32,8 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -39,6 +41,7 @@ namespace N
 			{
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -46,6 +49,7 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
@@ -83,6 +87,8 @@ namespace N
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
 		Dictionary<System.Int32, N.AData> OtherIdDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> OtherIdIndex => OtherIdDictionary;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -92,6 +98,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 				OtherIdDictionary.Add(d.OtherId, d);
 			}
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -100,6 +107,7 @@ namespace N
 				UniqueIndexDictionary[d.Id] = d;
 				OtherIdDictionary[d.OtherId] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
@@ -137,6 +145,8 @@ namespace N
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
 		Dictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameDictionary = new();
 		public IReadOnlyDictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameIndex => IdAndNameDictionary;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -146,6 +156,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 				IdAndNameDictionary.Add((d.Id, d.Name), d);
 			}
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -154,6 +165,7 @@ namespace N
 				UniqueIndexDictionary[d.Id] = d;
 				IdAndNameDictionary[(d.Id, d.Name)] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
@@ -191,6 +203,8 @@ namespace N
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
 		List<N.AData> SortedByNameList = new();
 		public IReadOnlyList<N.AData> SortedByName => SortedByNameList;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			var dataList = data.ToList();
@@ -200,6 +214,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
 			SortedByNameList = dataList.OrderBy(d => d.Name).ToList();
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -207,6 +222,7 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
@@ -244,6 +260,8 @@ namespace N
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
 		List<N.AData> SortedByNameDescList = new();
 		public IReadOnlyList<N.AData> SortedByNameDesc => SortedByNameDescList;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			var dataList = data.ToList();
@@ -253,6 +271,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
 			SortedByNameDescList = dataList.OrderByDescending(d => d.Name).ToList();
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -260,6 +279,7 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
@@ -298,6 +318,8 @@ namespace N
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
 		List<N.AData> SortedByLevelDescAndNameList = new();
 		public IReadOnlyList<N.AData> SortedByLevelDescAndName => SortedByLevelDescAndNameList;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			var dataList = data.ToList();
@@ -307,6 +329,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
 			SortedByLevelDescAndNameList = dataList.OrderByDescending(d => d.Level).ThenBy(d => d.Name).ToList();
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -314,6 +337,7 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
@@ -355,6 +379,8 @@ namespace N
 		public IReadOnlyDictionary<System.Int32, N.AData> OtherIdIndex => OtherIdDictionary;
 		Dictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameDictionary = new();
 		public IReadOnlyDictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameIndex => IdAndNameDictionary;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -366,6 +392,7 @@ namespace N
 				OtherIdDictionary.Add(d.OtherId, d);
 				IdAndNameDictionary.Add((d.Id, d.Name), d);
 			}
+			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
 		{
@@ -375,6 +402,7 @@ namespace N
 				OtherIdDictionary[d.OtherId] = d;
 				IdAndNameDictionary[(d.Id, d.Name)] = d;
 			}
+			OnDataUpdated();
 		}
 	}
 }
