@@ -220,11 +220,13 @@ using System.Linq;
 
 					foreach (var sort in sortList)
 					{
-						sb.AppendLine($"		List<{src.QualifiedName}> SortedBy{sort.CombinedName}List = new();");
-						sb.AppendLine($"		public IReadOnlyList<{src.QualifiedName}> SortedBy{sort.CombinedName} => SortedBy{sort.CombinedName}List;");
+						sb.AppendLine(@$"		List<{src.QualifiedName}> SortedBy{sort.CombinedName}List = new();
+		public IReadOnlyList<{src.QualifiedName}> SortedBy{sort.CombinedName} => SortedBy{sort.CombinedName}List;");
 					}
 
-					sb.AppendLine(@$"		public void SetData(IEnumerable<{src.QualifiedName}> data)
+					sb.AppendLine(@$"		partial void OnDataSet();
+		partial void OnDataUpdated();
+		public void SetData(IEnumerable<{src.QualifiedName}> data)
 		{{");
 
 					var dataVar = "data";
@@ -281,7 +283,8 @@ using System.Linq;
 						sb.AppendLine($"			SortedBy{sort.CombinedName}List = {dataVar}.{linq}.ToList();");
 					}
 
-					sb.AppendLine(@"		}");
+					sb.AppendLine(@"			OnDataSet();
+		}");
 
 
 					sb.AppendLine(@$"		public void UpdateData(IEnumerable<{src.QualifiedName}> data)
@@ -310,6 +313,7 @@ using System.Linq;
 						}
 					}
 					sb.AppendLine(@"			}
+			OnDataUpdated();
 		}
 	}");
 
