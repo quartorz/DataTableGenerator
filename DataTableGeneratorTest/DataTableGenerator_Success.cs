@@ -28,6 +28,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
@@ -81,6 +84,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
@@ -139,6 +145,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
@@ -197,6 +206,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
@@ -254,6 +266,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
@@ -312,6 +327,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
@@ -371,6 +389,9 @@ using System.Linq;
 
 namespace N
 {
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
 	public partial class ADataStore
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
