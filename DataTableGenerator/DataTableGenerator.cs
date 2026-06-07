@@ -65,6 +65,25 @@ namespace DataTableGenerator
 	}
 }
 ");
+
+				ctx.AddSource("DataTableSortComparerAttribute.cs", /* lang=C#-test, lang=C# */ @"
+using System;
+
+namespace DataTableGenerator
+{
+	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+	internal sealed class DataTableSortComparerAttribute : Attribute
+	{
+		public string Key;
+		public Type ComparerType;
+		public DataTableSortComparerAttribute(string key, Type comparerType)
+		{
+			Key = key;
+			ComparerType = comparerType;
+		}
+	}
+}
+");
 			});
 
 			var source = context.SyntaxProvider.ForAttributeWithMetadataName(
@@ -87,7 +106,12 @@ namespace DataTableGenerator
 			{
 				sortList.Add(new SortSource(attr));
 			}
-			return new GeneratorSource(context, targetSymbol, uniqueKey, indexList.ToArray(), sortList.ToArray());
+			var comparerList = new List<SortComparerSource>();
+			foreach (var attr in targetSymbol.FindAttributes("DataTableGenerator", "DataTableSortComparerAttribute"))
+			{
+				comparerList.Add(new SortComparerSource(attr));
+			}
+			return new GeneratorSource(context, targetSymbol, uniqueKey, indexList.ToArray(), sortList.ToArray(), comparerList.ToArray());
 		}
 
 		static void Emit(SourceProductionContext context, GeneratorSource source)
@@ -269,19 +293,61 @@ using System.Linq;
 					}
 					sb.AppendLine(@"			}");
 
+					var comparerMap = new Dictionary<string, string>();
+					foreach (var c in src.SortComparerSources)
+					{
+						if (c.Key == null)
+						{
+							Errors.SortComparerKeyRequired(ctx, src.Target, c.Attribute);
+							throw new Exception();
+						}
+						if (!members.ContainsKey(c.Key))
+						{
+							var m = src.Target.GetMembers(c.Key);
+							if (m.Length == 0)
+							{
+								Errors.InvalidSortComparerKeyName(ctx, src.Target, c.Attribute, c.Key);
+								throw new Exception();
+							}
+							switch (m[0])
+							{
+								case IFieldSymbol field:
+									members[c.Key] = (field, field.Type.QualifiedName());
+									break;
+								case IPropertySymbol property:
+									members[c.Key] = (property, property.Type.QualifiedName());
+									break;
+								default:
+									Errors.SortComparerKeyMustBePropertyOrField(ctx, src.Target, c.Attribute, c.Key);
+									throw new Exception();
+							}
+						}
+						if (c.ComparerTypeQualifiedName != null)
+						{
+							comparerMap[c.Key] = c.ComparerTypeQualifiedName;
+						}
+					}
+
+					string ComparerArg(string keyName)
+					{
+						return comparerMap.TryGetValue(keyName, out var t) ? $", new {t}()" : "";
+					}
+
 					foreach (var sort in sortList)
 					{
 						using var __ = StringBuilderHolder.Get(out var linq);
 						var firstKey = sort.Keys[0];
+						var firstArg = ComparerArg(firstKey.Name);
 						linq.Append(firstKey.Descending
-							? $"OrderByDescending(d => d.{firstKey.Name})"
-							: $"OrderBy(d => d.{firstKey.Name})");
+							? $"OrderByDescending(d => d.{firstKey.Name}{firstArg})"
+							: $"OrderBy(d => d.{firstKey.Name}{firstArg})");
 						for (var i = 1; i < sort.Keys.Length; i++)
 						{
 							var key = sort.Keys[i];
+							var arg = ComparerArg(key.Name);
 							linq.Append(key.Descending
-								? $".ThenByDescending(d => d.{key.Name})"
-								: $".ThenBy(d => d.{key.Name})");
+								? $".ThenByDescending(d => d.{key.Name}{arg})"
+								: $".ThenBy(d => d.{key.Name}{arg})");
 						}
 						sb.AppendLine($"			SortedBy{sort.CombinedName}List = {dataVar}.{linq}.ToList();");
 					}
