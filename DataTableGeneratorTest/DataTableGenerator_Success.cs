@@ -363,6 +363,139 @@ namespace N
 	}
 
 	[Fact]
+	public void SortWithComparer()
+	{
+		var generator = new DataTableGenerator.DataTableGenerator();
+
+		/* lang=C#-test, lang=C# */
+		var source = @"
+using System.Collections.Generic;
+namespace N
+{
+	[DataTableGenerator.DataTable(""Id"")]
+	[DataTableGenerator.DataTableSort(""Name"")]
+	[DataTableGenerator.DataTableSortComparer(""Name"", typeof(NameComparer))]
+	class AData
+	{
+		public int Id { get; set; }
+		public string Name { get; set; }
+	}
+	class NameComparer : IComparer<string>
+	{
+		public int Compare(string x, string y) => 0;
+	}
+}
+";
+
+		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+using System.Linq;
+
+namespace N
+{
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
+	public partial class ADataStore
+	{
+		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
+		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> SortedByNameList = new();
+		public IReadOnlyList<N.AData> SortedByName => SortedByNameList;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
+		public void SetData(IEnumerable<N.AData> data)
+		{
+			var dataList = data.ToList();
+			UniqueIndexDictionary.Clear();
+			foreach (var d in dataList)
+			{
+				UniqueIndexDictionary.Add(d.Id, d);
+			}
+			SortedByNameList = dataList.OrderBy(d => d.Name, new N.NameComparer()).ToList();
+			OnDataSet();
+		}
+		public void UpdateData(IEnumerable<N.AData> data)
+		{
+			foreach (var d in data)
+			{
+				UniqueIndexDictionary[d.Id] = d;
+			}
+			OnDataUpdated();
+		}
+	}
+}
+", r.Sources.Find(static x => x.HintName=="N AData.cs").SourceText.ToString());
+	}
+
+	[Fact]
+	public void MultipleKeysSortWithComparer()
+	{
+		var generator = new DataTableGenerator.DataTableGenerator();
+
+		/* lang=C#-test, lang=C# */
+		var source = @"
+using System.Collections.Generic;
+namespace N
+{
+	[DataTableGenerator.DataTable(""Id"")]
+	[DataTableGenerator.DataTableSort(""Level:desc"", ""Name"")]
+	[DataTableGenerator.DataTableSortComparer(""Name"", typeof(NameComparer))]
+	class AData
+	{
+		public int Id { get; set; }
+		public int Level { get; set; }
+		public string Name { get; set; }
+	}
+	class NameComparer : IComparer<string>
+	{
+		public int Compare(string x, string y) => 0;
+	}
+}
+";
+
+		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+using System.Linq;
+
+namespace N
+{
+	/// <summary>
+	/// Auto-generated data store for <see cref=""N.AData""/>.
+	/// </summary>
+	public partial class ADataStore
+	{
+		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
+		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> SortedByLevelDescAndNameList = new();
+		public IReadOnlyList<N.AData> SortedByLevelDescAndName => SortedByLevelDescAndNameList;
+		partial void OnDataSet();
+		partial void OnDataUpdated();
+		public void SetData(IEnumerable<N.AData> data)
+		{
+			var dataList = data.ToList();
+			UniqueIndexDictionary.Clear();
+			foreach (var d in dataList)
+			{
+				UniqueIndexDictionary.Add(d.Id, d);
+			}
+			SortedByLevelDescAndNameList = dataList.OrderByDescending(d => d.Level).ThenBy(d => d.Name, new N.NameComparer()).ToList();
+			OnDataSet();
+		}
+		public void UpdateData(IEnumerable<N.AData> data)
+		{
+			foreach (var d in data)
+			{
+				UniqueIndexDictionary[d.Id] = d;
+			}
+			OnDataUpdated();
+		}
+	}
+}
+", r.Sources.Find(static x => x.HintName=="N AData.cs").SourceText.ToString());
+	}
+
+	[Fact]
 	public void MultipleIndexes()
 	{
 		var generator = new DataTableGenerator.DataTableGenerator();

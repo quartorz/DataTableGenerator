@@ -211,6 +211,47 @@ namespace DataTableGenerator
 		}
 	}
 
+	internal class SortComparerSource : IEquatable<SortComparerSource>
+	{
+		public AttributeData Attribute { get; }
+		public string Key { get; }
+		public INamedTypeSymbol ComparerType { get; }
+		public string ComparerTypeQualifiedName { get; }
+
+		public SortComparerSource(AttributeData attribute)
+		{
+			Attribute = attribute;
+			var args = attribute.ConstructorArguments;
+			Key = args.Length > 0 ? args[0].Value as string : null;
+			ComparerType = args.Length > 1 ? args[1].Value as INamedTypeSymbol : null;
+			ComparerTypeQualifiedName = ComparerType?.QualifiedName();
+		}
+
+		public bool Equals(SortComparerSource other)
+		{
+			if (other is null) return false;
+			if (ReferenceEquals(this, other)) return true;
+			return Key == other.Key && ComparerTypeQualifiedName == other.ComparerTypeQualifiedName;
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (obj is null) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != GetType()) return false;
+			return Equals((SortComparerSource)obj);
+		}
+
+		public override int GetHashCode()
+		{
+			unchecked
+			{
+				return ((Key != null ? Key.GetHashCode() : 0) * 397) ^
+					(ComparerTypeQualifiedName != null ? ComparerTypeQualifiedName.GetHashCode() : 0);
+			}
+		}
+	}
+
 	internal class GeneratorSource : IEquatable<GeneratorSource>
 	{
 		public GeneratorAttributeSyntaxContext Context { get; }
@@ -221,9 +262,11 @@ namespace DataTableGenerator
 		public IndexSource UniqueKeySource { get; }
 		public IndexSource[] IndexSources { get; }
 		public SortSource[] SortSources { get; }
+		public SortComparerSource[] SortComparerSources { get; }
 
 		public GeneratorSource(GeneratorAttributeSyntaxContext context, INamedTypeSymbol target,
-			IndexSource uniqueKeySource, IndexSource[] indexSources, SortSource[] sortSources)
+			IndexSource uniqueKeySource, IndexSource[] indexSources, SortSource[] sortSources,
+			SortComparerSource[] sortComparerSources)
 		{
 			Context = context;
 			Target = target;
@@ -233,6 +276,7 @@ namespace DataTableGenerator
 			UniqueKeySource = uniqueKeySource;
 			IndexSources = indexSources;
 			SortSources = sortSources;
+			SortComparerSources = sortComparerSources;
 		}
 
 		public bool Equals(GeneratorSource other)
@@ -242,7 +286,8 @@ namespace DataTableGenerator
 			return Namespace == other.Namespace && Name == other.Name &&
 				UniqueKeySource.Equals(other.UniqueKeySource) &&
 				IndexSources.AsSpan().SequenceEqual(other.IndexSources) &&
-				SortSources.AsSpan().SequenceEqual(other.SortSources);
+				SortSources.AsSpan().SequenceEqual(other.SortSources) &&
+				SortComparerSources.AsSpan().SequenceEqual(other.SortComparerSources);
 		}
 
 		public override bool Equals(object obj)

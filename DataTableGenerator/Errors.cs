@@ -157,5 +157,41 @@ namespace DataTableGenerator
 				name, target.QualifiedName());
 			context.ReportDiagnostic(diagnostic);
 		}
+
+		public static void SortComparerKeyRequired(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator014", title: "Sort Comparer Key is Required",
+					messageFormat: "Sort comparer key is required for {0}", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
+
+		public static void InvalidSortComparerKeyName(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute, string name)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator015", title: "Invalid Sort Comparer Key Name",
+					messageFormat: "The name '{0}' is not a valid member name of {1}", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				name, target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
+
+		public static void SortComparerKeyMustBePropertyOrField(SourceProductionContext context, INamedTypeSymbol target,
+			AttributeData attribute, string name)
+		{
+			var diagnostic = Diagnostic.Create(
+				new DiagnosticDescriptor(id: "DataTableGenerator016", title: "Invalid Sort Comparer Key Name",
+					messageFormat: "'{0}' is not a property or field of {1}", category: "SourceGenerator",
+					DiagnosticSeverity.Error, isEnabledByDefault: true),
+				attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span),
+				name, target.QualifiedName());
+			context.ReportDiagnostic(diagnostic);
+		}
 	}
 }
