@@ -206,7 +206,10 @@ using System.Linq;
 {{");
 					}
 
-					sb.AppendLine(@$"	public partial class {src.Name}Store
+					sb.AppendLine(@$"	/// <summary>
+	/// Auto-generated data store for <see cref=""{src.QualifiedName}""/>.
+	/// </summary>
+	public partial class {src.Name}Store
 	{{
 		Dictionary<{uniqueKey.type}, {src.QualifiedName}> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<{uniqueKey.type}, {src.QualifiedName}> UniqueIndex => UniqueIndexDictionary;");
