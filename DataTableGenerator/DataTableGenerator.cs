@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 
@@ -65,12 +67,367 @@ namespace DataTableGenerator
 	}
 }
 ");
+
+				ctx.AddSource("GenerateDataTableStoreAttribute.cs", /* lang=C#-test, lang=C# */ @"
+using System;
+
+namespace DataTableGenerator
+{
+	// Targeted form: put this on a partial class to generate the store body into it, reading the row
+	// type given by typeof(...). Use when the row type itself cannot carry [DataTable] (e.g. it is not
+	// partial / is owned elsewhere). [DataTableIndex] / [DataTableSort] go on the annotated class.
+	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+	internal sealed class GenerateDataTableStoreAttribute : Attribute
+	{
+		public Type Target;
+		public string[] UniqueKeys;
+		public GenerateDataTableStoreAttribute(Type target, params string[] uniqueKeys)
+		{
+			Target = target;
+			UniqueKeys = uniqueKeys;
+		}
+	}
+}
+");
+
+				ctx.AddSource("GenerateAggregateStoreAttribute.cs", /* lang=C#-test, lang=C# */ @"
+using System;
+
+namespace DataTableGenerator
+{
+	// Put this on a partial class to generate SetData/UpdateData over an aggregate record:
+	// each array property composes the DataTable store of its element type, each property whose type
+	// has its own [GenerateAggregateStore] composes that nested store, and everything else is held
+	// whole. SetData overwrites; UpdateData applies only the non-null members of a delta.
+	[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+	internal sealed class GenerateAggregateStoreAttribute : Attribute
+	{
+		public Type Target;
+		public GenerateAggregateStoreAttribute(Type target)
+		{
+			Target = target;
+		}
+	}
+}
+");
 			});
 
 			var source = context.SyntaxProvider.ForAttributeWithMetadataName(
 				"DataTableGenerator.DataTableAttribute", static (node, token) => true,
 				Transform).WithTrackingName("DataTableGenerator.DataTable");
 			context.RegisterSourceOutput(source, Emit);
+
+			var targeted = context.SyntaxProvider.ForAttributeWithMetadataName(
+				"DataTableGenerator.GenerateDataTableStoreAttribute", static (node, token) => true,
+				TransformTargeted).WithTrackingName("DataTableGenerator.GenerateDataTableStore");
+			context.RegisterSourceOutput(targeted, Emit);
+
+			// Registry of "type -> store class" for every store-producing declaration in the compilation,
+			// so an aggregate can resolve which store to compose for each member type. SetData/UpdateData
+			// are fixed names, so the class name is all that is needed.
+			var inPlaceStores = context.SyntaxProvider.ForAttributeWithMetadataName(
+				"DataTableGenerator.DataTableAttribute", static (node, _) => true, StoreRefInPlace);
+			var targetedStores = context.SyntaxProvider.ForAttributeWithMetadataName(
+				"DataTableGenerator.GenerateDataTableStoreAttribute", static (node, _) => true, StoreRefTargeted);
+			var aggregateStores = context.SyntaxProvider.ForAttributeWithMetadataName(
+				"DataTableGenerator.GenerateAggregateStoreAttribute", static (node, _) => true, StoreRefAggregate);
+
+			var registry = inPlaceStores.Collect()
+				.Combine(targetedStores.Collect())
+				.Combine(aggregateStores.Collect())
+				.Select(static (t, _) => t.Left.Left.AddRange(t.Left.Right).AddRange(t.Right));
+
+			var aggregates = context.SyntaxProvider.ForAttributeWithMetadataName(
+				"DataTableGenerator.GenerateAggregateStoreAttribute", static (node, _) => node is not null,
+				TransformAggregate).WithTrackingName("DataTableGenerator.GenerateAggregateStore");
+
+			context.RegisterSourceOutput(aggregates.Combine(registry), EmitAggregate);
+		}
+
+		static GeneratorSource TransformTargeted(GeneratorAttributeSyntaxContext context,
+			CancellationToken cancellationToken)
+		{
+			var storeClass = (INamedTypeSymbol)context.TargetSymbol;
+			var attr = storeClass.FindAttribute("DataTableGenerator", "GenerateDataTableStoreAttribute");
+			var rowType = attr.ConstructorArguments[0].Value as INamedTypeSymbol;
+			var keys = attr.ConstructorArguments.Length > 1
+				? attr.ConstructorArguments[1].Values.Select(static v => v.Value as string).ToArray()
+				: Array.Empty<string>();
+			var uniqueKey = new IndexSource(attr, keys);
+			var indexList = new List<IndexSource>();
+			foreach (var a in storeClass.FindAttributes("DataTableGenerator", "DataTableIndexAttribute"))
+			{
+				indexList.Add(new IndexSource(a));
+			}
+			var sortList = new List<SortSource>();
+			foreach (var a in storeClass.FindAttributes("DataTableGenerator", "DataTableSortAttribute"))
+			{
+				sortList.Add(new SortSource(a));
+			}
+			return new GeneratorSource(context, rowType, storeClass, uniqueKey, indexList.ToArray(),
+				sortList.ToArray());
+		}
+
+		// ---- aggregate store -----------------------------------------------------------------
+
+		static readonly DiagnosticDescriptor MissingStoreDescriptor = new(
+			"DataTableGenerator007", "Aggregate store",
+			"No store found for type '{0}' (array member '{1}'). Declare [GenerateDataTableStore(typeof({0}), ...)].",
+			"SourceGenerator", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+		static StoreRef StoreRefInPlace(GeneratorAttributeSyntaxContext context, CancellationToken token)
+		{
+			var c = (INamedTypeSymbol)context.TargetSymbol;
+			return new StoreRef(c.QualifiedName(), c.QualifiedName() + "Store");
+		}
+
+		static StoreRef StoreRefTargeted(GeneratorAttributeSyntaxContext context, CancellationToken token)
+		{
+			var store = (INamedTypeSymbol)context.TargetSymbol;
+			var attr = store.FindAttribute("DataTableGenerator", "GenerateDataTableStoreAttribute");
+			var row = attr.ConstructorArguments[0].Value as INamedTypeSymbol;
+			return new StoreRef(row?.QualifiedName() ?? "", store.QualifiedName());
+		}
+
+		static StoreRef StoreRefAggregate(GeneratorAttributeSyntaxContext context, CancellationToken token)
+		{
+			var store = (INamedTypeSymbol)context.TargetSymbol;
+			var attr = store.FindAttribute("DataTableGenerator", "GenerateAggregateStoreAttribute");
+			var target = attr.ConstructorArguments[0].Value as INamedTypeSymbol;
+			return new StoreRef(target?.QualifiedName() ?? "", store.QualifiedName());
+		}
+
+		static AggregateModel TransformAggregate(GeneratorAttributeSyntaxContext context,
+			CancellationToken cancellationToken)
+		{
+			var store = (INamedTypeSymbol)context.TargetSymbol;
+			var ns = store.ContainingNamespace.IsGlobalNamespace ? null : store.ContainingNamespace.ToString();
+			var attr = store.FindAttribute("DataTableGenerator", "GenerateAggregateStoreAttribute");
+			var target = attr.ConstructorArguments[0].Value as INamedTypeSymbol;
+
+			var members = new List<AggregateMember>();
+			if (target != null)
+			{
+				foreach (var member in target.GetMembers())
+				{
+					ITypeSymbol type;
+					string name;
+					if (member is IPropertySymbol { DeclaredAccessibility: Accessibility.Public, IsStatic: false, IsIndexer: false } p)
+					{
+						type = p.Type;
+						name = p.Name;
+					}
+					else if (member is IFieldSymbol { DeclaredAccessibility: Accessibility.Public, IsStatic: false } f)
+					{
+						type = f.Type;
+						name = f.Name;
+					}
+					else
+					{
+						continue;
+					}
+
+					if (type is IArrayTypeSymbol array)
+					{
+						members.Add(new AggregateMember(name, type.QualifiedName(), array.ElementType.QualifiedName(),
+							isArray: true, guarded: true));
+					}
+					else
+					{
+						var isNullableValue = type is INamedTypeSymbol named &&
+							named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
+						var guarded = type.IsReferenceType || isNullableValue;
+						members.Add(new AggregateMember(name, type.QualifiedName(), type.QualifiedName(),
+							isArray: false, guarded: guarded));
+					}
+				}
+			}
+
+			return new AggregateModel(ns, store.Name, target?.QualifiedName() ?? "", members.ToArray());
+		}
+
+		static void EmitAggregate(SourceProductionContext context,
+			(AggregateModel Model, ImmutableArray<StoreRef> Registry) input)
+		{
+			var model = input.Model;
+			var map = new Dictionary<string, string>();
+			foreach (var store in input.Registry)
+			{
+				if (store != null && store.TypeFqn.Length > 0 && !map.ContainsKey(store.TypeFqn))
+				{
+					map[store.TypeFqn] = store.StoreClassFqn;
+				}
+			}
+
+			using var _ = StringBuilderHolder.Get(out var sb);
+			sb.AppendLine("using System.Collections.Generic;");
+			sb.AppendLine("using System.Linq;");
+			sb.AppendLine();
+
+			var indent = "";
+			if (model.Namespace != null)
+			{
+				sb.AppendLine($"namespace {model.Namespace}");
+				sb.AppendLine("{");
+				indent = "\t";
+			}
+			var m = indent + "\t";
+			var mm = m + "\t";
+
+			sb.AppendLine($"{indent}public partial class {model.ClassName}");
+			sb.AppendLine($"{indent}{{");
+
+			foreach (var member in model.Members)
+			{
+				if (map.TryGetValue(member.LookupFqn, out var store))
+				{
+					sb.AppendLine($"{m}public {store} {member.Name} {{ get; }} = new();");
+				}
+				else if (member.IsArray)
+				{
+					context.ReportDiagnostic(Diagnostic.Create(MissingStoreDescriptor, Location.None,
+						member.LookupFqn, member.Name));
+				}
+				else
+				{
+					sb.AppendLine($"{m}public {member.MemberTypeFqn} {member.Name} {{ get; private set; }}");
+				}
+			}
+
+			sb.AppendLine($"{m}public void SetData({model.TargetFqn} data)");
+			sb.AppendLine($"{m}{{");
+			foreach (var member in model.Members)
+			{
+				if (map.ContainsKey(member.LookupFqn))
+				{
+					sb.AppendLine($"{mm}{member.Name}.SetData(data.{member.Name});");
+				}
+				else if (!member.IsArray)
+				{
+					sb.AppendLine($"{mm}{member.Name} = data.{member.Name};");
+				}
+			}
+			sb.AppendLine($"{m}}}");
+
+			sb.AppendLine($"{m}public void UpdateData({model.TargetFqn} data)");
+			sb.AppendLine($"{m}{{");
+			foreach (var member in model.Members)
+			{
+				if (map.ContainsKey(member.LookupFqn))
+				{
+					sb.AppendLine($"{mm}if (data.{member.Name} != null) {member.Name}.UpdateData(data.{member.Name});");
+				}
+				else if (!member.IsArray)
+				{
+					if (member.Guarded)
+					{
+						sb.AppendLine($"{mm}if (data.{member.Name} != null) {member.Name} = data.{member.Name};");
+					}
+					else
+					{
+						sb.AppendLine($"{mm}{member.Name} = data.{member.Name};");
+					}
+				}
+			}
+			sb.AppendLine($"{m}}}");
+
+			sb.AppendLine($"{indent}}}");
+			if (model.Namespace != null)
+			{
+				sb.AppendLine("}");
+			}
+
+			context.AddSource($"{model.Namespace ?? "(global)"} {model.ClassName}.Aggregate.cs", sb.ToString());
+		}
+
+		internal sealed class StoreRef : IEquatable<StoreRef>
+		{
+			public string TypeFqn { get; }
+			public string StoreClassFqn { get; }
+
+			public StoreRef(string typeFqn, string storeClassFqn)
+			{
+				TypeFqn = typeFqn;
+				StoreClassFqn = storeClassFqn;
+			}
+
+			public bool Equals(StoreRef other) =>
+				other != null && TypeFqn == other.TypeFqn && StoreClassFqn == other.StoreClassFqn;
+
+			public override bool Equals(object obj) => obj is StoreRef s && Equals(s);
+			public override int GetHashCode() => (TypeFqn?.GetHashCode() ?? 0) ^ (StoreClassFqn?.GetHashCode() ?? 0);
+		}
+
+		internal sealed class AggregateMember : IEquatable<AggregateMember>
+		{
+			public string Name { get; }
+			public string MemberTypeFqn { get; }
+			public string LookupFqn { get; }
+			public bool IsArray { get; }
+			public bool Guarded { get; }
+
+			public AggregateMember(string name, string memberTypeFqn, string lookupFqn, bool isArray, bool guarded)
+			{
+				Name = name;
+				MemberTypeFqn = memberTypeFqn;
+				LookupFqn = lookupFqn;
+				IsArray = isArray;
+				Guarded = guarded;
+			}
+
+			public bool Equals(AggregateMember other) =>
+				other != null && Name == other.Name && MemberTypeFqn == other.MemberTypeFqn &&
+				LookupFqn == other.LookupFqn && IsArray == other.IsArray && Guarded == other.Guarded;
+
+			public override bool Equals(object obj) => obj is AggregateMember a && Equals(a);
+
+			public override int GetHashCode()
+			{
+				unchecked
+				{
+					var hash = 17;
+					hash = hash * 31 + (Name?.GetHashCode() ?? 0);
+					hash = hash * 31 + (MemberTypeFqn?.GetHashCode() ?? 0);
+					hash = hash * 31 + (LookupFqn?.GetHashCode() ?? 0);
+					hash = hash * 31 + IsArray.GetHashCode();
+					hash = hash * 31 + Guarded.GetHashCode();
+					return hash;
+				}
+			}
+		}
+
+		internal sealed class AggregateModel : IEquatable<AggregateModel>
+		{
+			public string Namespace { get; }
+			public string ClassName { get; }
+			public string TargetFqn { get; }
+			public AggregateMember[] Members { get; }
+
+			public AggregateModel(string ns, string className, string targetFqn, AggregateMember[] members)
+			{
+				Namespace = ns;
+				ClassName = className;
+				TargetFqn = targetFqn;
+				Members = members;
+			}
+
+			public bool Equals(AggregateModel other) =>
+				other != null && Namespace == other.Namespace && ClassName == other.ClassName &&
+				TargetFqn == other.TargetFqn && Members.AsSpan().SequenceEqual(other.Members.AsSpan());
+
+			public override bool Equals(object obj) => obj is AggregateModel a && Equals(a);
+
+			public override int GetHashCode()
+			{
+				unchecked
+				{
+					var hash = Namespace?.GetHashCode() ?? 0;
+					hash = hash * 31 + (ClassName?.GetHashCode() ?? 0);
+					hash = hash * 31 + (TargetFqn?.GetHashCode() ?? 0);
+					foreach (var member in Members) hash = hash * 31 + member.GetHashCode();
+					return hash;
+				}
+			}
 		}
 
 		static GeneratorSource Transform(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
@@ -206,10 +563,12 @@ using System.Linq;
 {{");
 					}
 
-					sb.AppendLine(@$"	public partial class {src.Name}Store
+					sb.AppendLine(@$"	public partial class {src.StoreClassName}
 	{{
 		Dictionary<{uniqueKey.type}, {src.QualifiedName}> UniqueIndexDictionary = new();
-		public IReadOnlyDictionary<{uniqueKey.type}, {src.QualifiedName}> UniqueIndex => UniqueIndexDictionary;");
+		public IReadOnlyDictionary<{uniqueKey.type}, {src.QualifiedName}> UniqueIndex => UniqueIndexDictionary;
+		List<{src.QualifiedName}> AllDataList = new();
+		public IReadOnlyList<{src.QualifiedName}> AllData => AllDataList;");
 
 					foreach (var index in indexList)
 					{
@@ -226,6 +585,7 @@ using System.Linq;
 
 					sb.AppendLine(@$"		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<{src.QualifiedName}> data)
 		{{");
 
@@ -283,9 +643,57 @@ using System.Linq;
 						sb.AppendLine($"			SortedBy{sort.CombinedName}List = {dataVar}.{linq}.ToList();");
 					}
 
-					sb.AppendLine(@"			OnDataSet();
+					sb.AppendLine(@"			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataSet();
 		}");
 
+
+					// UpdateData / RemoveData は unique 辞書だけを増分更新し、index 辞書・ソート済みリスト・
+					// AllDataList は unique 辞書の Values から作り直す。増分更新だと、更新で index キー値が
+					// 変わった行の旧エントリやソート済みリスト内の旧インスタンスが残るため。
+					void EmitRebuild()
+					{
+						if (indexList.Count > 0)
+						{
+							foreach (var index in indexList)
+							{
+								sb.AppendLine($"			{index.combinedName}Dictionary.Clear();");
+							}
+							sb.AppendLine(@"			foreach (var d in UniqueIndexDictionary.Values)
+			{");
+							foreach (var index in indexList)
+							{
+								if (index.names.Length == 1)
+								{
+									sb.AppendLine($"				{index.combinedName}Dictionary[d.{index.names[0]}] = d;");
+								}
+								else
+								{
+									sb.AppendLine(
+										$"				{index.combinedName}Dictionary[({string.Join(", ", index.names.Select(static x => "d." + x))})] = d;");
+								}
+							}
+							sb.AppendLine("			}");
+						}
+						foreach (var sort in sortList)
+						{
+							using var __ = StringBuilderHolder.Get(out var linq);
+							var firstKey = sort.Keys[0];
+							linq.Append(firstKey.Descending
+								? $"OrderByDescending(d => d.{firstKey.Name})"
+								: $"OrderBy(d => d.{firstKey.Name})");
+							for (var i = 1; i < sort.Keys.Length; i++)
+							{
+								var key = sort.Keys[i];
+								linq.Append(key.Descending
+									? $".ThenByDescending(d => d.{key.Name})"
+									: $".ThenBy(d => d.{key.Name})");
+							}
+							sb.AppendLine(
+								$"			SortedBy{sort.CombinedName}List = UniqueIndexDictionary.Values.{linq}.ToList();");
+						}
+						sb.AppendLine("			AllDataList = UniqueIndexDictionary.Values.ToList();");
+					}
 
 					sb.AppendLine(@$"		public void UpdateData(IEnumerable<{src.QualifiedName}> data)
 		{{
@@ -297,23 +705,21 @@ using System.Linq;
 					}
 					else
 					{
-						sb.AppendLine(
-							$"				UniqueIndexDictionary[({string.Join(", ", uniqueKey.names.Select(static x => "d." + x))}] = d;");
+							sb.AppendLine($"                UniqueIndexDictionary[({string.Join(", ", uniqueKey.names.Select(static x => "d." + x))})] = d;");
 					}
-					foreach (var index in indexList)
-					{
-						if (index.names.Length == 1)
-						{
-							sb.AppendLine($"				{index.combinedName}Dictionary[d.{index.names[0]}] = d;");
-						}
-						else
-						{
-							sb.AppendLine(
-								$"				{index.combinedName}Dictionary[({string.Join(", ", index.names.Select(static x => "d." + x))})] = d;");
-						}
-					}
-					sb.AppendLine(@"			}
-			OnDataUpdated();
+					sb.AppendLine(@"			}");
+					EmitRebuild();
+					sb.AppendLine(@"			OnDataUpdated();
+		}");
+
+					sb.AppendLine(@$"		public void RemoveData(IEnumerable<{uniqueKey.type}> keys)
+		{{
+			foreach (var key in keys)
+			{{
+				UniqueIndexDictionary.Remove(key);
+			}}");
+					EmitRebuild();
+					sb.AppendLine(@"			OnDataRemoved();
 		}
 	}");
 

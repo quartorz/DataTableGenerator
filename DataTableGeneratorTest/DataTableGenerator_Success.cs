@@ -32,8 +32,11 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -41,6 +44,7 @@ namespace N
 			{
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -49,7 +53,17 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
@@ -85,10 +99,13 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		Dictionary<System.Int32, N.AData> OtherIdDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> OtherIdIndex => OtherIdDictionary;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -98,6 +115,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 				OtherIdDictionary.Add(d.OtherId, d);
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -105,9 +123,28 @@ namespace N
 			foreach (var d in data)
 			{
 				UniqueIndexDictionary[d.Id] = d;
+			}
+			OtherIdDictionary.Clear();
+			foreach (var d in UniqueIndexDictionary.Values)
+			{
 				OtherIdDictionary[d.OtherId] = d;
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			OtherIdDictionary.Clear();
+			foreach (var d in UniqueIndexDictionary.Values)
+			{
+				OtherIdDictionary[d.OtherId] = d;
+			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
@@ -143,10 +180,13 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		Dictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameDictionary = new();
 		public IReadOnlyDictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameIndex => IdAndNameDictionary;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -156,6 +196,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 				IdAndNameDictionary.Add((d.Id, d.Name), d);
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -163,9 +204,28 @@ namespace N
 			foreach (var d in data)
 			{
 				UniqueIndexDictionary[d.Id] = d;
+			}
+			IdAndNameDictionary.Clear();
+			foreach (var d in UniqueIndexDictionary.Values)
+			{
 				IdAndNameDictionary[(d.Id, d.Name)] = d;
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			IdAndNameDictionary.Clear();
+			foreach (var d in UniqueIndexDictionary.Values)
+			{
+				IdAndNameDictionary[(d.Id, d.Name)] = d;
+			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
@@ -201,10 +261,13 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		List<N.AData> SortedByNameList = new();
 		public IReadOnlyList<N.AData> SortedByName => SortedByNameList;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			var dataList = data.ToList();
@@ -214,6 +277,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
 			SortedByNameList = dataList.OrderBy(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -222,7 +286,19 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			SortedByNameList = UniqueIndexDictionary.Values.OrderBy(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			SortedByNameList = UniqueIndexDictionary.Values.OrderBy(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
@@ -258,10 +334,13 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		List<N.AData> SortedByNameDescList = new();
 		public IReadOnlyList<N.AData> SortedByNameDesc => SortedByNameDescList;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			var dataList = data.ToList();
@@ -271,6 +350,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
 			SortedByNameDescList = dataList.OrderByDescending(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -279,7 +359,19 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			SortedByNameDescList = UniqueIndexDictionary.Values.OrderByDescending(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			SortedByNameDescList = UniqueIndexDictionary.Values.OrderByDescending(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
@@ -316,10 +408,13 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		List<N.AData> SortedByLevelDescAndNameList = new();
 		public IReadOnlyList<N.AData> SortedByLevelDescAndName => SortedByLevelDescAndNameList;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			var dataList = data.ToList();
@@ -329,6 +424,7 @@ namespace N
 				UniqueIndexDictionary.Add(d.Id, d);
 			}
 			SortedByLevelDescAndNameList = dataList.OrderByDescending(d => d.Level).ThenBy(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -337,7 +433,19 @@ namespace N
 			{
 				UniqueIndexDictionary[d.Id] = d;
 			}
+			SortedByLevelDescAndNameList = UniqueIndexDictionary.Values.OrderByDescending(d => d.Level).ThenBy(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			SortedByLevelDescAndNameList = UniqueIndexDictionary.Values.OrderByDescending(d => d.Level).ThenBy(d => d.Name).ToList();
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
@@ -375,12 +483,15 @@ namespace N
 	{
 		Dictionary<System.Int32, N.AData> UniqueIndexDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> UniqueIndex => UniqueIndexDictionary;
+		List<N.AData> AllDataList = new();
+		public IReadOnlyList<N.AData> AllData => AllDataList;
 		Dictionary<System.Int32, N.AData> OtherIdDictionary = new();
 		public IReadOnlyDictionary<System.Int32, N.AData> OtherIdIndex => OtherIdDictionary;
 		Dictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameDictionary = new();
 		public IReadOnlyDictionary<(System.Int32 Id, System.String Name), N.AData> IdAndNameIndex => IdAndNameDictionary;
 		partial void OnDataSet();
 		partial void OnDataUpdated();
+		partial void OnDataRemoved();
 		public void SetData(IEnumerable<N.AData> data)
 		{
 			UniqueIndexDictionary.Clear();
@@ -392,6 +503,7 @@ namespace N
 				OtherIdDictionary.Add(d.OtherId, d);
 				IdAndNameDictionary.Add((d.Id, d.Name), d);
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataSet();
 		}
 		public void UpdateData(IEnumerable<N.AData> data)
@@ -399,10 +511,32 @@ namespace N
 			foreach (var d in data)
 			{
 				UniqueIndexDictionary[d.Id] = d;
+			}
+			OtherIdDictionary.Clear();
+			IdAndNameDictionary.Clear();
+			foreach (var d in UniqueIndexDictionary.Values)
+			{
 				OtherIdDictionary[d.OtherId] = d;
 				IdAndNameDictionary[(d.Id, d.Name)] = d;
 			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
 			OnDataUpdated();
+		}
+		public void RemoveData(IEnumerable<System.Int32> keys)
+		{
+			foreach (var key in keys)
+			{
+				UniqueIndexDictionary.Remove(key);
+			}
+			OtherIdDictionary.Clear();
+			IdAndNameDictionary.Clear();
+			foreach (var d in UniqueIndexDictionary.Values)
+			{
+				OtherIdDictionary[d.OtherId] = d;
+				IdAndNameDictionary[(d.Id, d.Name)] = d;
+			}
+			AllDataList = UniqueIndexDictionary.Values.ToList();
+			OnDataRemoved();
 		}
 	}
 }
