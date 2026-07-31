@@ -17,6 +17,14 @@ namespace DataTableGenerator
 				.SelectMany(static x => x.Values.Select(static v => v.Value as string)).ToArray();
 		}
 
+		// Used when the key names do not come from the whole attribute's constructor arguments
+		// (e.g. [GenerateDataTableStore(typeof(X), "Id")] where the first argument is the row type).
+		public IndexSource(AttributeData attribute, string[] names)
+		{
+			Attribute = attribute;
+			Names = names;
+		}
+
 		public bool Equals(IndexSource other)
 		{
 			if (other is null) return false;
@@ -34,7 +42,12 @@ namespace DataTableGenerator
 
 		public override int GetHashCode()
 		{
-			return (Names != null ? Names.GetHashCode() : 0);
+			unchecked
+			{
+				var hash = 17;
+				foreach (var n in Names) hash = hash * 31 + (n?.GetHashCode() ?? 0);
+				return hash;
+			}
 		}
 
 		public string ToTypeString(
@@ -207,7 +220,12 @@ namespace DataTableGenerator
 
 		public override int GetHashCode()
 		{
-			return Keys != null ? Keys.GetHashCode() : 0;
+			unchecked
+			{
+				var hash = 17;
+				foreach (var k in Keys) hash = hash * 31 + (k?.GetHashCode() ?? 0);
+				return hash;
+			}
 		}
 	}
 
@@ -255,15 +273,27 @@ namespace DataTableGenerator
 	internal class GeneratorSource : IEquatable<GeneratorSource>
 	{
 		public GeneratorAttributeSyntaxContext Context { get; }
+
+		// The type whose members (key columns, indexes, sorts) are read.
 		public INamedTypeSymbol Target { get; }
+
+		// Namespace / hint-name seed of the generated store.
 		public string Namespace { get; }
 		public string Name { get; }
+
+		// The exact class name that is generated. For the in-place [DataTable] form this is
+		// "{Target.Name}Store"; for the [GenerateDataTableStore(typeof(X))] form it is the annotated
+		// partial class itself.
+		public string StoreClassName { get; }
+
+		// Fully-qualified name of the row type (Target).
 		public string QualifiedName { get; }
 		public IndexSource UniqueKeySource { get; }
 		public IndexSource[] IndexSources { get; }
 		public SortSource[] SortSources { get; }
 		public SortComparerSource[] SortComparerSources { get; }
 
+		// In-place form: [DataTable] is on the row type itself; store is "{RowType}Store".
 		public GeneratorSource(GeneratorAttributeSyntaxContext context, INamedTypeSymbol target,
 			IndexSource uniqueKeySource, IndexSource[] indexSources, SortSource[] sortSources,
 			SortComparerSource[] sortComparerSources)
@@ -272,7 +302,28 @@ namespace DataTableGenerator
 			Target = target;
 			Namespace = target.ContainingNamespace.IsGlobalNamespace ? null : target.ContainingNamespace.ToString();
 			Name = target.Name;
+			StoreClassName = target.Name + "Store";
 			QualifiedName = target.QualifiedName();
+			UniqueKeySource = uniqueKeySource;
+			IndexSources = indexSources;
+			SortSources = sortSources;
+			SortComparerSources = sortComparerSources;
+		}
+
+		// Targeted form: [GenerateDataTableStore(typeof(rowType), ...)] is on storeClass; the store body
+		// is generated into storeClass, while members are read from rowType.
+		public GeneratorSource(GeneratorAttributeSyntaxContext context, INamedTypeSymbol rowType,
+			INamedTypeSymbol storeClass, IndexSource uniqueKeySource, IndexSource[] indexSources,
+			SortSource[] sortSources, SortComparerSource[] sortComparerSources)
+		{
+			Context = context;
+			Target = rowType;
+			Namespace = storeClass.ContainingNamespace.IsGlobalNamespace
+				? null
+				: storeClass.ContainingNamespace.ToString();
+			Name = storeClass.Name;
+			StoreClassName = storeClass.Name;
+			QualifiedName = rowType.QualifiedName();
 			UniqueKeySource = uniqueKeySource;
 			IndexSources = indexSources;
 			SortSources = sortSources;
@@ -284,6 +335,7 @@ namespace DataTableGenerator
 			if (other is null) return false;
 			if (ReferenceEquals(this, other)) return true;
 			return Namespace == other.Namespace && Name == other.Name &&
+				StoreClassName == other.StoreClassName && QualifiedName == other.QualifiedName &&
 				UniqueKeySource.Equals(other.UniqueKeySource) &&
 				IndexSources.AsSpan().SequenceEqual(other.IndexSources) &&
 				SortSources.AsSpan().SequenceEqual(other.SortSources) &&
@@ -304,14 +356,15 @@ namespace DataTableGenerator
 			{
 				var hashCode = (Namespace != null ? Namespace.GetHashCode() : 0);
 				hashCode = (hashCode * 397) ^ (Name != null ? Name.GetHashCode() : 0);
-				hashCode = (hashCode * 397) ^ (IndexSources != null ? IndexSources.GetHashCode() : 0);
-				hashCode = (hashCode * 397) ^ (SortSources != null ? SortSources.GetHashCode() : 0);
+				hashCode = (hashCode * 397) ^ (StoreClassName != null ? StoreClassName.GetHashCode() : 0);
+				hashCode = (hashCode * 397) ^ (QualifiedName != null ? QualifiedName.GetHashCode() : 0);
+				hashCode = (hashCode * 397) ^ (UniqueKeySource?.GetHashCode() ?? 0);
+				foreach (var idx in IndexSources) hashCode = (hashCode * 397) ^ (idx?.GetHashCode() ?? 0);
+				foreach (var sort in SortSources) hashCode = (hashCode * 397) ^ (sort?.GetHashCode() ?? 0);
+				foreach (var cmp in SortComparerSources) hashCode = (hashCode * 397) ^ (cmp?.GetHashCode() ?? 0);
 				return hashCode;
 			}
 		}
 	}
 
-	partial class A
-	{
-	}
 }
