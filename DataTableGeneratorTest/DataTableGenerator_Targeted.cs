@@ -28,7 +28,9 @@ namespace N
 ";
 
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N

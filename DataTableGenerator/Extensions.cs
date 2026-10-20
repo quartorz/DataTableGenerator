@@ -55,10 +55,30 @@ namespace DataTableGenerator
 
 		public static string QualifiedName(this IArrayTypeSymbol self)
 		{
-			return $"{self.ElementType.QualifiedName()}[{string.Join("", Enumerable.Repeat(",", self.Rank - 1))}]";
+			return self.WithNullableSuffix(
+				$"{self.ElementType.QualifiedName()}[{string.Join("", Enumerable.Repeat(",", self.Rank - 1))}]");
 		}
 
 		public static string QualifiedName(this INamedTypeSymbol self)
+		{
+			return self.WithNullableSuffix(self.QualifiedNameWithoutAnnotation());
+		}
+
+		public static string QualifiedName(this ITypeParameterSymbol self)
+		{
+			return self.WithNullableSuffix(self.Name);
+		}
+
+		/// <summary>
+		/// Appends <c>?</c> when <paramref name="self"/> is annotated as nullable and is not a value type
+		/// (<c>Nullable&lt;T&gt;</c> is rendered by its generic form, so it needs no suffix).
+		/// </summary>
+		static string WithNullableSuffix(this ITypeSymbol self, string name)
+		{
+			return self.NullableAnnotation == NullableAnnotation.Annotated && !self.IsValueType ? name + "?" : name;
+		}
+
+		static string QualifiedNameWithoutAnnotation(this INamedTypeSymbol self)
 		{
 			using var _ = StringBuilderHolder.Get(out var sb);
 			if (self.ContainingNamespace.IsGlobalNamespace)
@@ -79,11 +99,6 @@ namespace DataTableGenerator
 			
 			sb.Append(self.Name).Append(self.TypeArguments.GenericArguments());
 			return sb.ToString();
-		}
-
-		public static string QualifiedName(this ITypeParameterSymbol self)
-		{
-			return self.Name;
 		}
 
 		public static string GenericArguments(this ImmutableArray<ITypeSymbol> self)

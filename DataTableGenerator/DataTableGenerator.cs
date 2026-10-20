@@ -13,6 +13,12 @@ namespace DataTableGenerator
 	[Generator(LanguageNames.CSharp)]
 	public class DataTableGenerator : IIncrementalGenerator
 	{
+		/// <summary>
+		/// First lines of every generated store: enables nullable annotations so the <c>?</c> the generator
+		/// emits is valid whatever the consuming assembly's nullable setting is.
+		/// </summary>
+		internal const string GeneratedFileHeader = "#nullable enable\n\n";
+
 		public void Initialize(IncrementalGeneratorInitializationContext context)
 		{
 			context.RegisterPostInitializationOutput(ctx =>
@@ -251,18 +257,37 @@ namespace DataTableGenerator
 						continue;
 					}
 
-					if (type is IArrayTypeSymbol array)
+					// Array members are delegated to a store, so SetData rejects null for them. Held-whole
+					// members keep the record's nullability: a nullable member may legitimately be null, a
+					// non-nullable reference member is unset until SetData and so gets `= null!`.
+					// Store lookup goes through the unannotated name so that `T?` resolves to the store
+					// registered for `T`. An annotated element type (`Row?[]`) also resolves to the store for `Row`;
+					// the generated SetData / UpdateData then reject null elements.
+					var isNonNullableReference = type.IsReferenceType &&
+						type.NullableAnnotation != NullableAnnotation.Annotated;
+					var unannotated = type.IsReferenceType
+						? type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
+						: type;
+					if (unannotated is IArrayTypeSymbol array)
 					{
-						members.Add(new AggregateMember(name, type.QualifiedName(), array.ElementType.QualifiedName(),
-							isArray: true, guarded: true));
+						var element = array.ElementType;
+						var elementIsNullable = element.IsReferenceType &&
+							element.NullableAnnotation == NullableAnnotation.Annotated;
+						var elementKey = element.IsReferenceType
+							? element.WithNullableAnnotation(NullableAnnotation.NotAnnotated).QualifiedName()
+							: element.QualifiedName();
+						members.Add(new AggregateMember(name, type.QualifiedName(), elementKey,
+							isArray: true, guarded: true, isNonNullableReference: isNonNullableReference,
+							elementIsNullable: elementIsNullable));
 					}
 					else
 					{
 						var isNullableValue = type is INamedTypeSymbol named &&
 							named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
 						var guarded = type.IsReferenceType || isNullableValue;
-						members.Add(new AggregateMember(name, type.QualifiedName(), type.QualifiedName(),
-							isArray: false, guarded: guarded));
+						members.Add(new AggregateMember(name, type.QualifiedName(), unannotated.QualifiedName(),
+							isArray: false, guarded: guarded, isNonNullableReference: isNonNullableReference,
+							elementIsNullable: false));
 					}
 				}
 			}
@@ -284,6 +309,7 @@ namespace DataTableGenerator
 			}
 
 			using var _ = StringBuilderHolder.Get(out var sb);
+			sb.Append(GeneratedFileHeader);
 			sb.AppendLine("using System.Collections.Generic;");
 			sb.AppendLine("using System.Linq;");
 			sb.AppendLine();
@@ -314,7 +340,8 @@ namespace DataTableGenerator
 				}
 				else
 				{
-					sb.AppendLine($"{m}public {member.MemberTypeFqn} {member.Name} {{ get; private set; }}");
+					var initializer = member.IsNonNullableReference ? " = null!;" : "";
+					sb.AppendLine($"{m}public {member.MemberTypeFqn} {member.Name} {{ get; private set; }}{initializer}");
 				}
 			}
 
@@ -324,7 +351,17 @@ namespace DataTableGenerator
 			{
 				if (map.ContainsKey(member.LookupFqn))
 				{
-					sb.AppendLine($"{mm}{member.Name}.SetData(data.{member.Name});");
+					if (member.ElementIsNullable)
+					{
+						sb.AppendLine($"{mm}{member.Name}.SetData((data.{member.Name} ?? " +
+							$"throw new global::System.ArgumentNullException(nameof(data.{member.Name})))" +
+							$".Select(x => x ?? throw new global::System.ArgumentNullException(nameof(data.{member.Name}))));");
+					}
+					else
+					{
+						sb.AppendLine($"{mm}{member.Name}.SetData(data.{member.Name} ?? " +
+							$"throw new global::System.ArgumentNullException(nameof(data.{member.Name})));");
+					}
 				}
 				else if (!member.IsArray)
 				{
@@ -339,7 +376,10 @@ namespace DataTableGenerator
 			{
 				if (map.ContainsKey(member.LookupFqn))
 				{
-					sb.AppendLine($"{mm}if (data.{member.Name} != null) {member.Name}.UpdateData(data.{member.Name});");
+					var updateArgument = member.ElementIsNullable
+						? $"data.{member.Name}.Select(x => x ?? throw new global::System.ArgumentNullException(nameof(data.{member.Name})))"
+						: $"data.{member.Name}";
+					sb.AppendLine($"{mm}if (data.{member.Name} != null) {member.Name}.UpdateData({updateArgument});");
 				}
 				else if (!member.IsArray)
 				{
@@ -389,19 +429,25 @@ namespace DataTableGenerator
 			public string LookupFqn { get; }
 			public bool IsArray { get; }
 			public bool Guarded { get; }
+			public bool IsNonNullableReference { get; }
+			public bool ElementIsNullable { get; }
 
-			public AggregateMember(string name, string memberTypeFqn, string lookupFqn, bool isArray, bool guarded)
+			public AggregateMember(string name, string memberTypeFqn, string lookupFqn, bool isArray, bool guarded,
+				bool isNonNullableReference, bool elementIsNullable)
 			{
 				Name = name;
 				MemberTypeFqn = memberTypeFqn;
 				LookupFqn = lookupFqn;
 				IsArray = isArray;
 				Guarded = guarded;
+				IsNonNullableReference = isNonNullableReference;
+				ElementIsNullable = elementIsNullable;
 			}
 
 			public bool Equals(AggregateMember other) =>
 				other != null && Name == other.Name && MemberTypeFqn == other.MemberTypeFqn &&
-				LookupFqn == other.LookupFqn && IsArray == other.IsArray && Guarded == other.Guarded;
+				LookupFqn == other.LookupFqn && IsArray == other.IsArray && Guarded == other.Guarded &&
+				IsNonNullableReference == other.IsNonNullableReference && ElementIsNullable == other.ElementIsNullable;
 
 			public override bool Equals(object obj) => obj is AggregateMember a && Equals(a);
 
@@ -415,6 +461,8 @@ namespace DataTableGenerator
 					hash = hash * 31 + (LookupFqn?.GetHashCode() ?? 0);
 					hash = hash * 31 + IsArray.GetHashCode();
 					hash = hash * 31 + Guarded.GetHashCode();
+					hash = hash * 31 + IsNonNullableReference.GetHashCode();
+					hash = hash * 31 + ElementIsNullable.GetHashCode();
 					return hash;
 				}
 			}
@@ -582,6 +630,7 @@ namespace DataTableGenerator
 						}
 					}
 
+					sb.Append(GeneratedFileHeader);
 					sb.AppendLine(@"using System.Collections.Generic;
 using System.Linq;
 ");

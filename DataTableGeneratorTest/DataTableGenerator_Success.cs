@@ -15,7 +15,7 @@ public class DataTableGenerator_Success
 namespace N
 {
 	[DataTableGenerator.DataTable(""Id"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 	}
@@ -23,7 +23,10 @@ namespace N
 ";
 		
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source1);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source1));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -84,7 +87,7 @@ namespace N
 {
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableIndex(""OtherId"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
         public int OtherId { get; set; }
@@ -93,7 +96,10 @@ namespace N
 ";
 		
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -168,7 +174,7 @@ namespace N
 {
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableIndex(""Id"", ""Name"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public string Name { get; set; }
@@ -177,7 +183,10 @@ namespace N
 ";
 		
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -252,7 +261,7 @@ namespace N
 {
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableSort(""Name"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public string Name { get; set; }
@@ -261,7 +270,10 @@ namespace N
 ";
 
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -328,7 +340,7 @@ namespace N
 {
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableSort(""Name:desc"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public string Name { get; set; }
@@ -337,7 +349,10 @@ namespace N
 ";
 
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -404,7 +419,7 @@ namespace N
 {
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableSort(""Level:desc"", ""Name"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public int Level { get; set; }
@@ -414,7 +429,10 @@ namespace N
 ";
 
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -483,12 +501,12 @@ namespace N
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableSort(""Name"")]
 	[DataTableGenerator.DataTableSortComparer(""Name"", typeof(NameComparer))]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public string Name { get; set; }
 	}
-	class NameComparer : IComparer<string>
+	public class NameComparer : IComparer<string>
 	{
 		public int Compare(string x, string y) => 0;
 	}
@@ -496,7 +514,10 @@ namespace N
 ";
 
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -565,13 +586,13 @@ namespace N
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableSort(""Level:desc"", ""Name"")]
 	[DataTableGenerator.DataTableSortComparer(""Name"", typeof(NameComparer))]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public int Level { get; set; }
 		public string Name { get; set; }
 	}
-	class NameComparer : IComparer<string>
+	public class NameComparer : IComparer<string>
 	{
 		public int Compare(string x, string y) => 0;
 	}
@@ -579,7 +600,10 @@ namespace N
 ";
 
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
@@ -647,7 +671,7 @@ namespace N
 	[DataTableGenerator.DataTable(""Id"")]
 	[DataTableGenerator.DataTableIndex(""OtherId"")]
 	[DataTableGenerator.DataTableIndex(""Id"", ""Name"")]
-	class AData
+	public class AData
 	{
 		public int Id { get; set; }
 		public int OtherId { get; set; }
@@ -657,7 +681,10 @@ namespace N
 ";
 		
 		var r = GeneratorRunner.RunAndFilter(generator.AsSourceGenerator(), "DataTableGenerator", source);
-		Assert.Equal(/* lang=C#-test, lang=C# */ @"using System.Collections.Generic;
+		Assert.Empty(GeneratorRunner.CompileNullableAndCollectGeneratedDiagnostics(generator.AsSourceGenerator(), source));
+		Assert.Equal(/* lang=C#-test, lang=C# */ @"#nullable enable
+
+using System.Collections.Generic;
 using System.Linq;
 
 namespace N
